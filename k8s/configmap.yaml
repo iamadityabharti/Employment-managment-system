@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-ems-config
+  namespace: atlas-ems
+data:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://ems.atlas.example.com"
+  JWT_ACCESS_TTL: "15m"
+  JWT_REFRESH_TTL: "7d"
+  OUTBOX_POLL_MS: "1000"
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX: "100"
+  NOTIFICATION_EMAIL_MODE: "mock"
+  NOTIFICATION_EMAIL_FROM: "no-reply@atlas.example.com"
+  # Service discovery (K8s internal DNS)
+  AUTH_SERVICE_URL: "http://auth-service.atlas-ems.svc.cluster.local:3001"
+  EMPLOYEE_SERVICE_URL: "http://employee-service.atlas-ems.svc.cluster.local:3002"
+  ATTENDANCE_SERVICE_URL: "http://attendance-service.atlas-ems.svc.cluster.local:3003"
+  PAYROLL_SERVICE_URL: "http://payroll-service.atlas-ems.svc.cluster.local:3004"
+  NOTIFICATION_SERVICE_URL: "http://notification-service.atlas-ems.svc.cluster.local:3005"

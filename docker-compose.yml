@@ -1,0 +1,339 @@
+name: atlas-ems
+
+x-service-defaults: &service-defaults
+  init: true
+  restart: unless-stopped
+  networks:
+    - atlas
+  environment:
+    NODE_ENV: ${NODE_ENV:-development}
+    CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+    JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+    JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+    JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+    OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas_dev_password}
+      POSTGRES_DB: postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/10-init-multiple-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - atlas
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-atlas}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-atlas_dev_password}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    networks:
+      - atlas
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - atlas
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_INITDB_ROOT_USERNAME:-atlas}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_INITDB_ROOT_PASSWORD:-atlas_dev_password}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    networks:
+      - atlas
+
+  auth:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/auth"
+    image: atlas-ems-auth:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3001"
+      DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql://atlas:atlas_dev_password@postgres:5432/auth_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  employee:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/employee"
+    image: atlas-ems-employee:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3002"
+      DATABASE_URL: ${EMPLOYEE_DATABASE_URL:-postgresql://atlas:atlas_dev_password@postgres:5432/employee_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  attendance:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/attendance"
+    image: atlas-ems-attendance:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3003"
+      DATABASE_URL: ${ATTENDANCE_DATABASE_URL:-postgresql://atlas:atlas_dev_password@postgres:5432/attendance_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL:-http://employee:3002}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      employee:
+        condition: service_healthy
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  payroll:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/payroll"
+    image: atlas-ems-payroll:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3004"
+      DATABASE_URL: ${PAYROLL_DATABASE_URL:-postgresql://atlas:atlas_dev_password@postgres:5432/payroll_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  notification:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/notification"
+    image: atlas-ems-notification:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3005"
+      MONGODB_URI: ${MONGODB_URI:-mongodb://atlas:atlas_dev_password@mongo:27017/notification_db?authSource=admin}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://atlas:atlas_dev_password@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:-no-reply@atlas.local}
+      NOTIFICATION_EMAIL_MODE: ${NOTIFICATION_EMAIL_MODE:-mock}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3005:3005"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3005/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  gateway:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/gateway"
+    image: atlas-ems-gateway:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "3000"
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth:3001}
+      EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL:-http://employee:3002}
+      ATTENDANCE_SERVICE_URL: ${ATTENDANCE_SERVICE_URL:-http://attendance:3003}
+      PAYROLL_SERVICE_URL: ${PAYROLL_SERVICE_URL:-http://payroll:3004}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification:3005}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      employee:
+        condition: service_healthy
+      attendance:
+        condition: service_healthy
+      payroll:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  web:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_WORKSPACE: "@atlas/web"
+    image: atlas-ems-web:local
+    command: ["sh", "-c", "npm run preview --workspace=@atlas/web -- --host 0.0.0.0 --port 5173"]
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+networks:
+  atlas:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  redis-data:
+  mongo-data:

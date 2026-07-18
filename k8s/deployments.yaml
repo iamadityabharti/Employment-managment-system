@@ -1,0 +1,390 @@
+---
+# ── Gateway ──────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: atlas-ems
+  labels:
+    app: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: atlas-ems/gateway:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: atlas-ems
+spec:
+  type: LoadBalancer
+  selector:
+    app: gateway
+  ports:
+    - port: 80
+      targetPort: 3000
+
+---
+# ── Auth Service ────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: atlas-ems
+  labels:
+    app: auth
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+        - name: auth
+          image: atlas-ems/auth:latest
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ems-secrets
+                  key: DATABASE_URL_AUTH
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: atlas-ems
+spec:
+  selector:
+    app: auth
+  ports:
+    - port: 3001
+      targetPort: 3001
+
+---
+# ── Employee Service ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: employee
+  namespace: atlas-ems
+  labels:
+    app: employee
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: employee
+  template:
+    metadata:
+      labels:
+        app: employee
+    spec:
+      containers:
+        - name: employee
+          image: atlas-ems/employee:latest
+          ports:
+            - containerPort: 3002
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ems-secrets
+                  key: DATABASE_URL_EMPLOYEE
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3002
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: employee-service
+  namespace: atlas-ems
+spec:
+  selector:
+    app: employee
+  ports:
+    - port: 3002
+      targetPort: 3002
+
+---
+# ── Attendance Service ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attendance
+  namespace: atlas-ems
+  labels:
+    app: attendance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: attendance
+  template:
+    metadata:
+      labels:
+        app: attendance
+    spec:
+      containers:
+        - name: attendance
+          image: atlas-ems/attendance:latest
+          ports:
+            - containerPort: 3003
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ems-secrets
+                  key: DATABASE_URL_ATTENDANCE
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: attendance-service
+  namespace: atlas-ems
+spec:
+  selector:
+    app: attendance
+  ports:
+    - port: 3003
+      targetPort: 3003
+
+---
+# ── Payroll Service ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll
+  namespace: atlas-ems
+  labels:
+    app: payroll
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payroll
+  template:
+    metadata:
+      labels:
+        app: payroll
+    spec:
+      containers:
+        - name: payroll
+          image: atlas-ems/payroll:latest
+          ports:
+            - containerPort: 3004
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ems-secrets
+                  key: DATABASE_URL_PAYROLL
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3004
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payroll-service
+  namespace: atlas-ems
+spec:
+  selector:
+    app: payroll
+  ports:
+    - port: 3004
+      targetPort: 3004
+
+---
+# ── Notification Service ────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification
+  namespace: atlas-ems
+  labels:
+    app: notification
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      containers:
+        - name: notification
+          image: atlas-ems/notification:latest
+          ports:
+            - containerPort: 3005
+          envFrom:
+            - configMapRef:
+                name: atlas-ems-config
+            - secretRef:
+                name: atlas-ems-secrets
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3005
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: atlas-ems
+spec:
+  selector:
+    app: notification
+  ports:
+    - port: 3005
+      targetPort: 3005
