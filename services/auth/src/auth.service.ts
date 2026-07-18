@@ -16,7 +16,7 @@ import {
 import { AuthRepository, type AuthUserRecord } from './auth.repository';
 import { LoginRateLimiter } from './login-rate-limiter';
 
-interface TokenPair {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresInSeconds: number;

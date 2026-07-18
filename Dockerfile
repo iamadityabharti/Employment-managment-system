@@ -10,6 +10,7 @@ FROM base AS build
 COPY . .
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 RUN npm run build
+RUN npm run build --workspace=@atlas/web || true
 
 FROM base AS runtime
 ENV NODE_ENV=production
@@ -21,6 +22,7 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/packages ./packages
 COPY --from=build --chown=node:node /app/services ./services
 COPY --from=build --chown=node:node /app/apps ./apps
+COPY --from=build --chown=node:node /app/tsconfig.base.json ./tsconfig.base.json
 
 USER node
 EXPOSE 3000

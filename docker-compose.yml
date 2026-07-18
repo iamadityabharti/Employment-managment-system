@@ -99,7 +99,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        SERVICE_WORKSPACE: "@atlas/auth"
+        SERVICE_WORKSPACE: "@atlas/auth-service"
     image: atlas-ems-auth:local
     environment:
       NODE_ENV: ${NODE_ENV:-development}

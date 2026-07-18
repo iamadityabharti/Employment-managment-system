@@ -1,5 +1,5 @@
 import { Global, Injectable, Module, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import type { DomainEvent } from '@atlas/contracts';
 import { StructuredLogger } from './logger';
 
@@ -26,10 +26,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return this.pool;
   }
 
-  query<T = Record<string, unknown>>(
+  query<T extends QueryResultRow = Record<string, unknown>>(
     text: string,
     values?: unknown[]
-  ): Promise<{ rows: T[]; rowCount: number; oid: number; command: string; fields: unknown[] }> {
+  ): Promise<QueryResult<T>> {
     return this.client.query<T>(text, values);
   }
 

@@ -163,10 +163,10 @@ function unwrapCollection<T>(response: T[] | CollectionResponse<T>): T[] {
 }
 
 export const authApi = {
-  async login(input: LoginInput) {
+    async login(input: LoginInput) {
     return apiRequest<LoginResponse>('/auth/login', {
       method: 'POST',
-      body: input,
+      body: input as unknown as Record<string, unknown>,
       skipAuth: true,
       retryOnUnauthorized: false
     });

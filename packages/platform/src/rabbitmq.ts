@@ -210,7 +210,13 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
 
 @Global()
 @Module({
-  providers: [RabbitMqService, OutboxRelayService],
-  exports: [RabbitMqService, OutboxRelayService]
+  providers: [RabbitMqService],
+  exports: [RabbitMqService]
 })
 export class RabbitMqModule {}
+
+@Module({
+  providers: [OutboxRelayService],
+  exports: [OutboxRelayService]
+})
+export class OutboxModule {}
