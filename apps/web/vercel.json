@@ -1,0 +1,9 @@
+{
+  "buildCommand": "echo 'already built'",
+  "outputDirectory": "dist",
+  "installCommand": "echo 'no install'",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
