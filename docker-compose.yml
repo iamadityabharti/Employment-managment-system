@@ -277,7 +277,7 @@ services:
       ATTENDANCE_SERVICE_URL: ${ATTENDANCE_SERVICE_URL:-http://attendance:3003}
       PAYROLL_SERVICE_URL: ${PAYROLL_SERVICE_URL:-http://payroll:3004}
       NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification:3005}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,https://eloquent-scone-c5a29e.netlify.app}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-this-with-a-long-random-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-this-with-a-different-long-random-refresh-secret}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
