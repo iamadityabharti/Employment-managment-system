@@ -4,7 +4,7 @@ Atlas EMS is a production-oriented Employee Management System built as a TypeScr
 
 ## Architecture first
 
-### Service boundaries
+### Service boundaries.
 
 | Service | Owns | Synchronous responsibility | Asynchronous responsibility |
 | --- | --- | --- | --- |
